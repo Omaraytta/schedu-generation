@@ -3,6 +3,11 @@
 # Core dependencies for backend communication
 requests>=2.31.0
 python-dotenv>=1.0.0
-
+Flask==3.0.0
+pandas==2.0.3
+openpyxl==3.1.2
 # Optional dependencies for enhanced functionality
 setuptools>=65.0.0  # For package installation
+
+gunicorn==21.2.0
+

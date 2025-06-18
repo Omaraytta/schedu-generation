@@ -20,6 +20,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -U pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# Install gunicorn explicitly
+RUN pip install --no-cache-dir gunicorn==21.2.0
+
 # Copy application code
 COPY . .
 
