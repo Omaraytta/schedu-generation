@@ -3,7 +3,7 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8000 \
+    # Remove PORT from build-time ENV
     LARAVEL_URL=https://your-laravel-app.up.railway.app \
     API_KEY=your_shared_secret
 
@@ -30,11 +30,11 @@ COPY . .
 RUN useradd -m myuser
 USER myuser
 
-# Expose port
-EXPOSE $PORT
+# Use fixed port in EXPOSE (documentation only)
+EXPOSE 8000
 
-# Start the application
+# Start with static port configuration
 CMD ["gunicorn", "app:app", \
-    "--bind", "0.0.0.0:$PORT", \
+    "--bind", "0.0.0.0:8000", \
     "--workers", "2", \
     "--threads", "4"]
