@@ -11,3 +11,10 @@ setuptools>=65.0.0  # For package installation
 
 gunicorn==21.2.0
 
+fastapi==0.111.0
+uvicorn==0.30.0
+pydantic==2.7.1
+requests==2.31.0
+python-dotenv==1.0.1
+
+

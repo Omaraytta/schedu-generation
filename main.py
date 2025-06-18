@@ -877,6 +877,44 @@ def main():
     return 0 if success else 1
 
 
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
+import subprocess
+import json
+
+app = FastAPI()
+
+class ScheduleRequest(BaseModel):
+    study_plans: list[int]
+    name_en: str
+    name_ar: str
+
+@app.post("/generate")
+async def generate_schedule(req: ScheduleRequest):
+    try:
+        args = ["python", "main.py", "--name-en", req.name_en, "--name-ar", req.name_ar]
+        for sp in req.study_plans:
+            args.extend(["--study-plans", str(sp)])
+
+        result = subprocess.run(args, capture_output=True, text=True)
+
+        try:
+            with open("schedule_progress.json", "r", encoding="utf-8") as f:
+                progress = json.load(f)
+        except FileNotFoundError:
+            progress = None
+
+        return {
+            "status": "success" if result.returncode == 0 else "failed",
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "progress": progress,
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 if __name__ == "__main__":
     exit_code = main()
     sys.exit(exit_code)
