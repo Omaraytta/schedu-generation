@@ -877,43 +877,94 @@ def main():
     return 0 if success else 1
 
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import List
 import subprocess
 import json
+import os
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
-class ScheduleRequest(BaseModel):
-    study_plans: list[int]
+
+class GenerateRequest(BaseModel):
+    study_plans: List[int]
     name_en: str
     name_ar: str
 
+
 @app.post("/generate")
-async def generate_schedule(req: ScheduleRequest):
+def generate_schedule(req: GenerateRequest):
+    args = [
+        "python", "main.py",
+        "--study-plans", *map(str, req.study_plans),
+        "--name-en", req.name_en,
+        "--name-ar", req.name_ar
+    ]
+
+    process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+
+    # Load progress if available
+    progress_data = {}
     try:
-        args = ["python", "main.py", "--name-en", req.name_en, "--name-ar", req.name_ar]
-        for sp in req.study_plans:
-            args.extend(["--study-plans", str(sp)])
+        with open("schedule_progress.json", "r", encoding="utf-8") as f:
+            progress_data = json.load(f)
+    except Exception:
+        pass
 
-        result = subprocess.run(args, capture_output=True, text=True)
+    return {
+        "status": "success" if process.returncode == 0 else "failed",
+        "stdout": stdout.decode(),
+        "stderr": stderr.decode(),
+        "progress": progress_data  
+    }
 
-        try:
-            with open("schedule_progress.json", "r", encoding="utf-8") as f:
-                progress = json.load(f)
-        except FileNotFoundError:
-            progress = None
 
-        return {
-            "status": "success" if result.returncode == 0 else "failed",
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "progress": progress,
-        }
+@app.get("/progress")
+def get_progress():
+    progress_file = "schedule_progress.json"
 
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    if not os.path.exists(progress_file):
+        raise HTTPException(status_code=404, detail="Progress file not found")
 
+    with open(progress_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    return data
+
+
+@app.get("/study-plans")
+def get_study_plans():
+    backend_url = os.getenv("BACKEND_URL")
+    email = os.getenv("EMAIL")
+    password = os.getenv("PASSWORD")
+
+    if not backend_url or not email or not password:
+        raise HTTPException(status_code=500, detail="Missing backend credentials")
+
+    # Login to backend
+    login_resp = requests.post(
+        f"{backend_url}/login",
+        json={"email": email, "password": password}
+    )
+
+    if login_resp.status_code != 200 or "data" not in login_resp.json():
+        raise HTTPException(status_code=401, detail="Login failed")
+
+    token = login_resp.json()["data"]["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Get study plans list
+    sp_resp = requests.get(f"{backend_url}/study-plans", headers=headers)
+    if sp_resp.status_code != 200:
+        raise HTTPException(status_code=500, detail="Failed to fetch study plans")
+
+    return sp_resp.json()
 
 if __name__ == "__main__":
     exit_code = main()
